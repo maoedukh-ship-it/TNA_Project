@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TNA Web App</title>
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div id="loginScreen">
+      <?!= include('Login'); ?>
+    </div>
+
+    <div id="appScreen" class="hidden">
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="brand-wrap">
+            <div class="brand-mark">TNA</div>
+            <div>
+              <div class="brand-name">TNA Portal</div>
+              <div class="brand-subtitle">Wing Shop</div>
+            </div>
+          </div>
+
+          <nav class="nav" aria-label="Main navigation">
+            <div class="nav-group-label">Workspace</div>
+            <a href="#overview" class="nav-item active" data-view="overview"><span class="nav-icon">▦</span>Overview</a>
+            <a href="#my-tna" class="nav-item" data-view="my-tna"><span class="nav-icon">▤</span>My TNA</a>
+            <a href="#register" class="nav-item" data-view="register"><span class="nav-icon">☷</span>Assessment Register</a>
+            <a href="#approvals" class="nav-item" data-view="approvals"><span class="nav-icon">✓</span>Approval Queue</a>
+            <div class="nav-group-label nav-group-spaced">Administration</div>
+            <a href="#users" class="nav-item" data-view="users"><span class="nav-icon">♙</span>User Management</a>
+            <a href="#settings" class="nav-item" data-view="settings"><span class="nav-icon">⚙</span>System Settings</a>
+          </nav>
+
+          <div class="sidebar-footer">
+            <div class="sidebar-status">System Health</div>
+            <div class="status-pill online">Online</div>
+          </div>
+        </aside>
+
+        <main class="main-panel">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">Learning and development</p>
+              <h1 id="pageTitle">Training Needs Analysis</h1>
+            </div>
+
+            <div class="topbar-actions">
+              <button type="button" id="themeToggle" class="icon-button" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+              <span id="userStatus" class="badge neutral">Loading...</span>
+              <button id="logoutButton" class="btn btn-secondary">Logout</button>
+              <button id="initButton" class="btn btn-primary">Initialize App</button>
+            </div>
+          </header>
+
+          <div id="adminBanner" class="admin-banner hidden">
+            <span>Logged in as: System Administrator</span>
+            <span>Admin Access</span>
+          </div>
+
+          <div id="alertBox" class="alert hidden"></div>
+
+          <section class="content view-panel" id="view-overview" data-page-title="Overview">
+            <div class="summary-grid">
+              <div class="summary-card">
+                <div class="summary-label">Total TNA</div>
+                <div id="totalTna" class="summary-value">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Drafts</div>
+                <div id="draftTna" class="summary-value">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Pending Employee Ack.</div>
+                <div id="pendingAck" class="summary-value">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Pending HOD Approval</div>
+                <div id="pendingHod" class="summary-value">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Returned for Revision</div>
+                <div id="returnedTna" class="summary-value">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Approved</div>
+                <div id="approvedTna" class="summary-value">0</div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-kicker">Live workflow</p>
+                  <h2>Assessment pipeline</h2>
+                </div>
+              </div>
+              <div class="workflow-chart" id="workflowChart" aria-label="Assessments by workflow status"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-kicker">Your workspace</p>
+                  <h2>Assessment workflow</h2>
+                </div>
+              </div>
+              <div id="systemState" class="system-state">Loading application state...</div>
+            </div>
+          </section>
+
+          <section class="content view-panel hidden" id="view-my-tna" data-page-title="My TNA">
+            <div class="panel">
+              <div class="panel-header"><div><p class="section-kicker">Create and update</p><h2>My TNA</h2></div></div>
+              <?!= include('TNAForm'); ?>
+            </div>
+          </section>
+
+          <section class="content view-panel hidden" id="view-register" data-page-title="Assessment Register">
+            <div class="panel">
+              <div class="panel-header"><div><p class="section-kicker">Administrator view</p><h2>Assessment Register</h2></div></div>
+              <?!= include('AdminDashboard'); ?>
+            </div>
+          </section>
+
+          <section class="content view-panel hidden" id="view-approvals" data-page-title="Approval Queue">
+            <div class="panel">
+              <div class="panel-header"><div><p class="section-kicker">Review workflow</p><h2>Approval Queue</h2></div></div>
+              <?!= include('ApprovalQueue'); ?>
+            </div>
+          </section>
+
+          <section class="content view-panel hidden" id="view-users" data-page-title="User Management">
+            <div class="panel">
+              <div class="panel-header user-panel-header">
+                <div><p class="section-kicker">Access administration</p><h2>User Management</h2></div>
+                <button type="button" id="refreshUsersButton" class="btn btn-secondary">Refresh users</button>
+              </div>
+              <div id="usersMessage" class="system-state">Loading users...</div>
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead><tr><th>Name</th><th>Email</th><th>Employee ID</th><th>Department</th><th>Status</th></tr></thead>
+                  <tbody id="usersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="content view-panel hidden" id="view-settings" data-page-title="System Settings">
+            <div class="panel settings-panel">
+              <div class="panel-header"><div><p class="section-kicker">Personalization</p><h2>System Settings</h2></div></div>
+              <div class="setting-row">
+                <div><strong>Dark appearance</strong><div class="setting-description">Use a darker color scheme for the admin workspace.</div></div>
+                <label class="switch-control"><input type="checkbox" id="darkModeSetting"><span class="switch-track"></span><span class="sr-only">Enable dark mode</span></label>
+              </div>
+              <div class="setting-row">
+                <div><strong>Application setup</strong><div class="setting-description">Check and initialize the application sheets and defaults.</div></div>
+                <button type="button" id="settingsInitializeButton" class="btn btn-primary">Initialize application</button>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <?!= include('JavaScript'); ?>
+  </body>
+</html>

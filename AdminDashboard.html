@@ -1,0 +1,127 @@
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+
+  .stat-box {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-top: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 10px;
+    text-align: left;
+  }
+</style>
+
+<div class="dashboard-grid">
+  <div class="stat-box">
+    <div>Total TNA</div>
+    <div id="adminTotalTna" class="stat-value">0</div>
+  </div>
+  <div class="stat-box">
+    <div>Drafts</div>
+    <div id="adminDraftTna" class="stat-value">0</div>
+  </div>
+  <div class="stat-box">
+    <div>Pending Ack.</div>
+    <div id="adminPendingAck" class="stat-value">0</div>
+  </div>
+  <div class="stat-box">
+    <div>Pending HOD</div>
+    <div id="adminPendingHod" class="stat-value">0</div>
+  </div>
+  <div class="stat-box">
+    <div>Returned</div>
+    <div id="adminReturned" class="stat-value">0</div>
+  </div>
+  <div class="stat-box">
+    <div>Approved</div>
+    <div id="adminApproved" class="stat-value">0</div>
+  </div>
+</div>
+
+<div class="workflow-monitor" style="margin-top: 18px;">
+  <h3>Workflow monitor</h3>
+  <div class="table-scroll">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>TNA</th>
+        <th>Employee</th>
+        <th>Status</th>
+        <th>Pending Action</th>
+        <th>Reminder</th>
+      </tr>
+    </thead>
+    <tbody id="adminMonitorBody"></tbody>
+  </table>
+  </div>
+</div>
+
+<script>
+  (function() {
+    function loadAdminDashboard() {
+      google.script.run.withSuccessHandler(function(response) {
+        if (response && response.success) {
+          var data = response.data || {};
+          document.getElementById('adminTotalTna').textContent = data.totalAssessmentCount || 0;
+          document.getElementById('adminDraftTna').textContent = data.draftCount || 0;
+          document.getElementById('adminPendingAck').textContent = data.pendingEmployeeAcknowledgment || 0;
+          document.getElementById('adminPendingHod').textContent = data.pendingHodApproval || 0;
+          document.getElementById('adminReturned').textContent = data.returnedCount || 0;
+          document.getElementById('adminApproved').textContent = data.approvedCount || 0;
+        }
+      }).getDashboardSummary();
+
+      google.script.run.withSuccessHandler(function(rows) {
+        var tbody = document.getElementById('adminMonitorBody');
+        tbody.textContent = '';
+        (rows || []).forEach(function(item) {
+          var tr = document.createElement('tr');
+          [item.TNAReference, item.EmployeeID, item.CurrentStatus, item.CurrentStatus].forEach(function(value) {
+            var cell = document.createElement('td');
+            cell.textContent = value || '-';
+            tr.appendChild(cell);
+          });
+          var actionCell = document.createElement('td');
+          var reminderButton = document.createElement('button');
+          reminderButton.type = 'button';
+          reminderButton.className = 'btn btn-secondary';
+          reminderButton.textContent = 'Send Reminder';
+          reminderButton.addEventListener('click', function() {
+            google.script.run.withSuccessHandler(function(response) {
+              showAlert((response && response.message) || 'Reminder request completed.', response && response.success ? 'success' : 'error');
+            }).withFailureHandler(function(error) {
+              showAlert('Reminder failed: ' + error.message, 'error');
+            }).sendAssessmentReminder(item.TNAID);
+          });
+          actionCell.appendChild(reminderButton);
+          tr.appendChild(actionCell);
+          tbody.appendChild(tr);
+        });
+      }).withFailureHandler(function(error) {
+        showAlert('Unable to load assessments: ' + error.message, 'error');
+      }).getTNAForCurrentUser();
+    }
+
+    loadAdminDashboard();
+  })();
+</script>

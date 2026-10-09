@@ -1,0 +1,278 @@
+<script>
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+  function isAdminLoggedIn() {
+    return localStorage.getItem('tna_admin_session') === 'true';
+  }
+
+  function persistAdminSession(username) {
+    localStorage.setItem('tna_admin_session', 'true');
+    localStorage.setItem('tna_admin_user', username);
+    localStorage.setItem('tna_admin_last_activity', Date.now().toString());
+  }
+
+  function clearAdminSession() {
+    localStorage.removeItem('tna_admin_session');
+    localStorage.removeItem('tna_admin_user');
+    localStorage.removeItem('tna_admin_last_activity');
+  }
+
+  function isSessionExpired() {
+    const lastActivity = Number(localStorage.getItem('tna_admin_last_activity') || '0');
+    if (!lastActivity) {
+      return true;
+    }
+    return (Date.now() - lastActivity) > SESSION_TIMEOUT_MS;
+  }
+
+  function keepSessionAlive() {
+    if (isAdminLoggedIn()) {
+      localStorage.setItem('tna_admin_last_activity', Date.now().toString());
+    }
+  }
+
+  function showApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appScreen').classList.remove('hidden');
+  }
+
+  function showLogin() {
+    document.getElementById('appScreen').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+
+  function showAlert(message, type) {
+    const box = document.getElementById('alertBox');
+    if (!box) {
+      return;
+    }
+    box.textContent = message;
+    box.className = 'alert ' + type;
+    box.classList.remove('hidden');
+  }
+
+  function renderDashboard(summaryData) {
+    document.getElementById('totalTna').textContent = summaryData.totalAssessmentCount || 0;
+    document.getElementById('draftTna').textContent = summaryData.draftCount || 0;
+    document.getElementById('pendingAck').textContent = summaryData.pendingEmployeeAcknowledgment || 0;
+    document.getElementById('pendingHod').textContent = summaryData.pendingHodApproval || 0;
+    document.getElementById('returnedTna').textContent = summaryData.returnedCount || 0;
+    document.getElementById('approvedTna').textContent = summaryData.approvedCount || 0;
+
+    const statuses = [
+      { label: 'Draft', count: summaryData.draftCount || 0, className: 'workflow-draft' },
+      { label: 'Pending employee acknowledgment', count: summaryData.pendingEmployeeAcknowledgment || 0, className: 'workflow-ack' },
+      { label: 'Pending HOD approval', count: summaryData.pendingHodApproval || 0, className: 'workflow-hod' },
+      { label: 'Returned for revision', count: summaryData.returnedCount || 0, className: 'workflow-returned' },
+      { label: 'Approved', count: summaryData.approvedCount || 0, className: 'workflow-approved' }
+    ];
+    const chart = document.getElementById('workflowChart');
+    const maximum = Math.max.apply(null, statuses.map(function(status) { return status.count; }).concat([1]));
+    chart.textContent = '';
+    statuses.forEach(function(status) {
+      const row = document.createElement('div');
+      row.className = 'workflow-row';
+      const label = document.createElement('span');
+      label.className = 'workflow-label';
+      label.textContent = status.label;
+      const track = document.createElement('div');
+      track.className = 'workflow-track';
+      const bar = document.createElement('div');
+      bar.className = 'workflow-bar ' + status.className;
+      bar.style.width = (status.count ? Math.max(4, status.count / maximum * 100) : 0) + '%';
+      track.appendChild(bar);
+      const count = document.createElement('span');
+      count.className = 'workflow-count';
+      count.textContent = status.count;
+      row.append(label, track, count);
+      chart.appendChild(row);
+    });
+  }
+
+  function showView(viewName) {
+    document.querySelectorAll('.view-panel').forEach(function(panel) {
+      panel.classList.toggle('hidden', panel.id !== 'view-' + viewName);
+    });
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+      item.classList.toggle('active', item.dataset.view === viewName);
+    });
+    const activePanel = document.getElementById('view-' + viewName);
+    if (activePanel) {
+      document.getElementById('pageTitle').textContent = activePanel.dataset.pageTitle;
+    }
+    if (viewName === 'users') {
+      loadAdminUsers();
+    }
+  }
+
+  function loadAdminUsers() {
+    const message = document.getElementById('usersMessage');
+    const body = document.getElementById('usersTableBody');
+    message.textContent = 'Loading users...';
+    body.textContent = '';
+    google.script.run.withSuccessHandler(function(response) {
+      if (!response || !response.success) {
+        message.textContent = (response && response.message) || 'Unable to load users.';
+        return;
+      }
+      const users = response.data || [];
+      message.textContent = users.length ? users.length + ' users' : 'No users found.';
+      users.forEach(function(user) {
+        const row = document.createElement('tr');
+        [user.FullName, user.Email, user.EmployeeID, user.DepartmentID, user.AccountStatus].forEach(function(value) {
+          const cell = document.createElement('td');
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+    }).withFailureHandler(function(error) {
+      message.textContent = 'Unable to load users: ' + error.message;
+    }).listUsersForAdmin();
+  }
+
+  function setDarkMode(enabled) {
+    document.body.dataset.theme = enabled ? 'dark' : 'light';
+    localStorage.setItem('tna_admin_theme', enabled ? 'dark' : 'light');
+    document.getElementById('darkModeSetting').checked = enabled;
+  }
+
+  function setUserStatus(label, isActive) {
+    const status = document.getElementById('userStatus');
+    if (!status) {
+      return;
+    }
+    status.textContent = label;
+    status.className = 'badge ' + (isActive ? 'success' : 'warning');
+  }
+
+  function setAdminBanner(visible) {
+    const banner = document.getElementById('adminBanner');
+    if (!banner) {
+      return;
+    }
+    if (visible) {
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  function initializeApplication() {
+    google.script.run.withSuccessHandler(function(response) {
+      if (response && response.success) {
+        showAlert(response.message || 'Application initialized successfully.', 'success');
+      } else {
+        showAlert((response && response.message) || 'Initialization failed.', 'error');
+      }
+    }).withFailureHandler(function(error) {
+      showAlert('Initialization error: ' + error.message, 'error');
+    }).initializeApp();
+  }
+
+  function initializePage() {
+    if (!isAdminLoggedIn() || isSessionExpired()) {
+      clearAdminSession();
+      showLogin();
+      return;
+    }
+
+    keepSessionAlive();
+    showApp();
+    setUserStatus('Admin logged in', true);
+    setAdminBanner(true);
+
+    google.script.run.withSuccessHandler(function(response) {
+      const state = document.getElementById('systemState');
+      if (response && response.success && response.data && response.data.user) {
+        setUserStatus(response.data.user.FullName || response.data.user.Email, true);
+        state.textContent = 'Connected as ' + (response.data.user.FullName || response.data.user.Email) + '. Your administrator workspace is ready.';
+      } else {
+        setUserStatus('Not authenticated', false);
+        state.textContent = response && response.message ? response.message : 'Authentication is required.';
+      }
+    }).withFailureHandler(function(error) {
+      document.getElementById('systemState').textContent = 'Authentication check failed: ' + error.message;
+      setUserStatus('Error', false);
+    }).getAppState();
+
+    google.script.run.withSuccessHandler(function(response) {
+      if (response && response.success) {
+        renderDashboard(response.data || {});
+      }
+    }).withFailureHandler(function(error) {
+      document.getElementById('systemState').textContent = 'Dashboard error: ' + error.message;
+    }).getDashboardSummary();
+  }
+
+  document.querySelectorAll('.nav-item').forEach(function(item) {
+    item.addEventListener('click', function(event) {
+      event.preventDefault();
+      showView(item.dataset.view);
+    });
+  });
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    setDarkMode(document.body.dataset.theme !== 'dark');
+  });
+  document.getElementById('darkModeSetting').addEventListener('change', function(event) {
+    setDarkMode(event.target.checked);
+  });
+  document.getElementById('refreshUsersButton').addEventListener('click', loadAdminUsers);
+  document.getElementById('settingsInitializeButton').addEventListener('click', initializeApplication);
+
+  document.getElementById('adminLoginForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+    const messageBox = document.getElementById('loginMessage');
+
+    if (!username || !password) {
+      messageBox.textContent = 'Please enter both username and password.';
+      return;
+    }
+
+    google.script.run.withSuccessHandler(function(response) {
+      if (response && response.success) {
+        persistAdminSession(username);
+        messageBox.textContent = '';
+        showApp();
+        initializePage();
+      } else {
+        messageBox.textContent = (response && response.message) || 'Login failed.';
+      }
+    }).withFailureHandler(function(error) {
+      messageBox.textContent = 'Login failed: ' + error.message;
+    }).loginAdmin(username, password);
+  });
+
+  document.getElementById('togglePassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('loginPassword');
+    const toggle = document.getElementById('togglePassword');
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggle.textContent = 'Hide';
+    } else {
+      passwordInput.type = 'password';
+      toggle.textContent = 'Show';
+    }
+  });
+
+  document.getElementById('logoutButton').addEventListener('click', function() {
+    clearAdminSession();
+    setAdminBanner(false);
+    showLogin();
+  });
+
+  document.getElementById('initButton').addEventListener('click', initializeApplication);
+  window.addEventListener('load', initializePage);
+  setDarkMode(localStorage.getItem('tna_admin_theme') === 'dark');
+  document.addEventListener('mousemove', keepSessionAlive);
+  document.addEventListener('keydown', keepSessionAlive);
+  setInterval(function() {
+    if (isAdminLoggedIn() && isSessionExpired()) {
+      clearAdminSession();
+      showLogin();
+    }
+  }, 60000);
+</script>

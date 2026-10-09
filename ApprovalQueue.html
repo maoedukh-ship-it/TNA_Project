@@ -1,0 +1,75 @@
+<style>
+  .approval-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    padding: 16px;
+    margin-top: 12px;
+  }
+
+  .approval-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .approval-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+</style>
+
+<div class="approval-card">
+  <h3>Workflow actions</h3>
+  <div class="approval-grid">
+    <div class="field">
+      <label for="approvalTnaId">TNA ID</label>
+      <input id="approvalTnaId" type="text" value="TNA-2026-0001" />
+    </div>
+    <div class="field">
+      <label for="approvalComment">Comment</label>
+      <textarea id="approvalComment" rows="3">Approved after review.</textarea>
+    </div>
+  </div>
+
+  <div class="approval-actions">
+    <button class="btn btn-primary" id="acknowledgeBtn">Acknowledge Assessment</button>
+    <button class="btn btn-secondary" id="returnBtn">Return for Revision</button>
+    <button class="btn btn-primary" id="approveBtn">Approve Assessment</button>
+    <button class="btn btn-secondary" id="hodReturnBtn">HOD Return</button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    function callServer(methodName, args, successText) {
+      google.script.run.withSuccessHandler(function(response) {
+        if (response && response.success) {
+          showAlert(successText, 'success');
+        } else {
+          showAlert((response && response.message) || 'Action failed.', 'error');
+        }
+      }).withFailureHandler(function(error) {
+        showAlert(methodName + ' failed: ' + error.message, 'error');
+      })[methodName].apply(null, args);
+    }
+
+    document.getElementById('acknowledgeBtn').addEventListener('click', function() {
+      callServer('acknowledgeAssessment', [document.getElementById('approvalTnaId').value, document.getElementById('approvalComment').value], 'Assessment acknowledged successfully.');
+    });
+
+    document.getElementById('returnBtn').addEventListener('click', function() {
+      callServer('returnAssessmentForRevision', [document.getElementById('approvalTnaId').value, document.getElementById('approvalComment').value], 'Assessment returned to manager for revision.');
+    });
+
+    document.getElementById('approveBtn').addEventListener('click', function() {
+      callServer('approveAssessment', [document.getElementById('approvalTnaId').value, document.getElementById('approvalComment').value], 'Assessment approved successfully.');
+    });
+
+    document.getElementById('hodReturnBtn').addEventListener('click', function() {
+      callServer('hodReturnAssessment', [document.getElementById('approvalTnaId').value, document.getElementById('approvalComment').value], 'Assessment returned for revision by HOD.');
+    });
+  })();
+</script>

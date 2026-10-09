@@ -1,0 +1,215 @@
+<style>
+  .tna-form {
+    display: grid;
+    gap: 18px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.96rem;
+  }
+
+  .competency-block {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+    background: #f9fafb;
+  }
+
+  .button-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .btn-secondary {
+    background: #e5e7eb;
+    color: #111827;
+  }
+</style>
+
+<div class="tna-form">
+  <div class="form-grid">
+    <div class="field">
+      <label for="employeeId">Employee ID</label>
+      <input id="employeeId" type="text" value="EMP-001" />
+    </div>
+    <div class="field">
+      <label for="employeeName">Employee Name</label>
+      <input id="employeeName" type="text" value="Jane Employee" />
+    </div>
+    <div class="field">
+      <label for="departmentId">Department</label>
+      <input id="departmentId" type="text" value="HR" />
+    </div>
+    <div class="field">
+      <label for="jobTitle">Job Title</label>
+      <input id="jobTitle" type="text" value="Staff Analyst" />
+    </div>
+    <div class="field">
+      <label for="assessmentPeriod">Assessment Period</label>
+      <input id="assessmentPeriod" type="text" value="2026" />
+    </div>
+  </div>
+
+  <div id="competencyContainer"></div>
+
+  <div class="button-row">
+    <button id="saveDraftBtn" class="btn btn-primary">Save Draft</button>
+    <button id="saveAndAddBtn" class="btn btn-secondary">Save & Add New</button>
+    <button id="submitBtn" class="btn btn-primary">Submit Assessment</button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var currentTnaId = null;
+
+    function buildCompetencyRows() {
+      var container = document.getElementById('competencyContainer');
+      container.innerHTML = '';
+
+      var competencies = [
+        { name: 'Communication', rating: 4, gap: 'No major gap' },
+        { name: 'Project Management', rating: 3, gap: 'Needs planning support' },
+        { name: 'Technical Skills', rating: 3, gap: 'Could improve advanced tools' }
+      ];
+
+      competencies.forEach(function(item, index) {
+        var block = document.createElement('div');
+        block.className = 'competency-block';
+        block.innerHTML = `
+          <div class="form-grid">
+            <div class="field">
+              <label>Competency Name</label>
+              <input type="text" value="${item.name}" data-role="competency-name" />
+            </div>
+            <div class="field">
+              <label>Rating (1-5)</label>
+              <input type="number" min="1" max="5" value="${item.rating}" data-role="competency-rating" />
+            </div>
+            <div class="field">
+              <label>Gap / Development Need</label>
+              <input type="text" value="${item.gap}" data-role="competency-gap" />
+            </div>
+          </div>
+        `;
+        container.appendChild(block);
+      });
+    }
+
+    function getAssessmentPayload() {
+      var items = Array.from(document.querySelectorAll('[data-role="competency-name"]')).map(function(input, idx) {
+        return {
+          Name: input.value,
+          Rating: document.querySelectorAll('[data-role="competency-rating"]')[idx].value,
+          Gap: document.querySelectorAll('[data-role="competency-gap"]')[idx].value
+        };
+      });
+
+      return {
+        EmployeeID: document.getElementById('employeeId').value,
+        EmployeeName: document.getElementById('employeeName').value,
+        DepartmentID: document.getElementById('departmentId').value,
+        JobTitle: document.getElementById('jobTitle').value,
+        AssessmentPeriod: document.getElementById('assessmentPeriod').value,
+        ManagerUserID: '',
+        HODUserID: '',
+        Competencies: items,
+        OverallComment: 'Needs focus on project planning and advanced tool usage.'
+      };
+    }
+
+    function handleResponse(response, successMessage) {
+      if (response && response.success) {
+        if (response.data && response.data.TNAID) {
+          currentTnaId = response.data.TNAID;
+        }
+        showAlert(successMessage || 'Action completed.', 'success');
+      } else {
+        showAlert((response && response.message) || 'Action failed.', 'error');
+      }
+    }
+
+    function saveDraft() {
+      var payload = getAssessmentPayload();
+      if (currentTnaId) {
+        google.script.run.withSuccessHandler(function(response) {
+          handleResponse(response, 'Draft saved successfully.');
+        }).withFailureHandler(function(error) {
+          showAlert('Draft save failed: ' + error.message, 'error');
+        }).saveAssessmentDraft(currentTnaId, payload);
+      } else {
+        google.script.run.withSuccessHandler(function(response) {
+          handleResponse(response, 'Assessment created and saved as draft.');
+        }).withFailureHandler(function(error) {
+          showAlert('Draft creation failed: ' + error.message, 'error');
+        }).createNewAssessment(payload);
+      }
+    }
+
+    function saveAndAddNew() {
+      var payload = getAssessmentPayload();
+      google.script.run.withSuccessHandler(function(response) {
+        handleResponse(response, 'Draft saved and form reset for a new assessment.');
+        currentTnaId = null;
+        buildCompetencyRows();
+        document.getElementById('employeeId').value = 'EMP-' + Math.floor(Math.random() * 90 + 10);
+      }).withFailureHandler(function(error) {
+        showAlert('Save & add new failed: ' + error.message, 'error');
+      }).createNewAssessment(payload);
+    }
+
+    function submitAssessment() {
+      var payload = getAssessmentPayload();
+      if (!currentTnaId) {
+        google.script.run.withSuccessHandler(function(response) {
+          if (response && response.success && response.data && response.data.TNAID) {
+            currentTnaId = response.data.TNAID;
+          }
+          doSubmit(currentTnaId, payload);
+        }).withFailureHandler(function(error) {
+          showAlert('Assessment creation failed before submission: ' + error.message, 'error');
+        }).createNewAssessment(payload);
+      } else {
+        doSubmit(currentTnaId, payload);
+      }
+    }
+
+    function doSubmit(id, payload) {
+      google.script.run.withSuccessHandler(function(response) {
+        handleResponse(response, 'Assessment submitted for employee acknowledgment.');
+      }).withFailureHandler(function(error) {
+        showAlert('Submission failed: ' + error.message, 'error');
+      }).submitAssessment(id, payload);
+    }
+
+    document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+    document.getElementById('saveAndAddBtn').addEventListener('click', saveAndAddNew);
+    document.getElementById('submitBtn').addEventListener('click', submitAssessment);
+
+    buildCompetencyRows();
+  })();
+</script>
